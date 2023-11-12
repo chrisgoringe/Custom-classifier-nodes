@@ -5,17 +5,25 @@ import os, json
 import numpy as np
 from server import PromptServer
 import folder_paths
+import comfy.model_management
 
-def create_probability_calculator(model_folder, labels=[]):
-    feature_extractor = ViTImageProcessor.from_pretrained(model_folder)
-    device = "cuda"
-    model = AutoModelForImageClassification.from_pretrained(model_folder, output_hidden_states=True).to(device)
+def create_probability_calculator(model_directory, labels=[]):
+    model = AutoModelForImageClassification.from_pretrained(model_directory, output_hidden_states=True)
+    if model.base_model_prefix == 'efficientnet':
+        feature_extractor = EfficientNetImageProcessor.from_pretrained(model_directory)
+    else:
+        feature_extractor = ViTImageProcessor.from_pretrained(model_directory)
+
+    device = comfy.model_management.vae_device()
+    offload_device = comfy.model_management.vae_offload_device()
 
     def calculate_probabilities(image):
         if image.mode != "RGB": image = image.convert("RGB")
         inputs = feature_extractor(images=[image], return_tensors="pt").to(device)
         with torch.no_grad():
+            model.to(device)
             outputs = model(**inputs)
+            model.to(offload_device)
             probs = torch.nn.functional.softmax(outputs.logits, dim=-1)[0]
             if len(probs)==len(labels):
                 return { labels[i]:float(probs[i]) for i in range(len(labels)) }
@@ -59,31 +67,36 @@ class BaseClassifier:
         return cls._pc
     
     @classmethod
-    def get_probs(cls, model_directory, image):    
-        try:
-            with open(os.path.join(model_directory,'categories.json')) as f:
-                categories = json.load(f)['categories']
-        except:
-            categories = []
+    def get_probs(cls, classifier, image):    
+
+        for folder in folder_paths.folder_names_and_paths["customclassifier"][0]:
+            if os.path.exists(os.path.join(folder,classifier)):
+                with open(os.path.join(folder,classifier,'categories.json')) as f:
+                    categories = json.load(f)['categories']
 
         i = 255. * image[0].cpu().numpy()
         image = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
 
-        return cls.probability_calculator(model_directory, categories)(image)
+        return cls.probability_calculator(os.path.join(folder,classifier), categories)(image)
 
 
 class ImageClassification(BaseClassifier):
     @classmethod
     def INPUT_TYPES(s):
+        model_directories = []
+        for folder in folder_paths.folder_names_and_paths["customclassifier"][0]:
+            for subfolder in os.listdir(folder):
+                if os.path.exists(os.path.join(folder,subfolder,"categories.json")):
+                    model_directories.append(subfolder)
+
         return {"required": { 
-            "classifier": (folder_paths.get_filename_list("customclassifier"), ),
+            "classifier": (model_directories, ),
             "image": ("IMAGE", {}),
         } }
     
     RETURN_TYPES = ("STRING", "FLOAT",  "STRING")
     RETURN_NAMES = ("Category", "Probability", "Details")
     
-
     def func(self, classifier, image):
         probabilities = self.get_probs(classifier, image)
         idx, category, prob = most_likely(probabilities)
