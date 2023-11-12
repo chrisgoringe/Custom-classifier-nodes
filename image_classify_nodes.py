@@ -11,7 +11,10 @@ def create_probability_calculator(model_directory, labels=[]):
     model = AutoModelForImageClassification.from_pretrained(model_directory, output_hidden_states=True)
     if model.base_model_prefix == 'efficientnet':
         feature_extractor = EfficientNetImageProcessor.from_pretrained(model_directory)
+    elif model.base_model_prefix == 'vit':
+        feature_extractor = ViTImageProcessor.from_pretrained(model_directory)
     else:
+        print("Din't recognise the model - using ViTImageProcessor and hoping for the best")
         feature_extractor = ViTImageProcessor.from_pretrained(model_directory)
 
     device = comfy.model_management.vae_device()
