@@ -124,7 +124,7 @@ class ImageCategoryScorer(BaseClassifier):
         }
     
     RETURN_TYPES = ("FLOATLIST",  "STRING")
-    RETURN_NAMES = ("Probabilities", "ProbString")
+    RETURN_NAMES = ("scores", "ProbString")
 
     def func(self, classifier, images, category, node_id):
         probs = [self.get_probs(classifier, image).get(category,0) for image in images]
