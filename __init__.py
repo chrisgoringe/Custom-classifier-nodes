@@ -1,11 +1,13 @@
-from .image_classify_nodes import *
+from .custom_classify_nodes import *
 from .utility_nodes import *
 
 NODE_CLASS_MAPPINGS = { 
-    "Image Classifier" : ImageClassification,
+    "Single Image Classifier" : ImageClassification,
     "Image Category Scorer": ImageCategoryScorer,
     "Save If": SaveIf,
     "Running Average": RunningAverage,
+    "Score Operations": ScoreOperations,
+    "Show Scores": ShowScores,
     }
 
 __all__ = ['NODE_CLASS_MAPPINGS']

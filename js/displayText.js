@@ -27,7 +27,9 @@ app.registerExtension({
         api.addEventListener("cg.image_classify.textmessage", messageHandler);
     },
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
-        if (nodeType.prototype.comfyClass=="Running Average" || nodeType.prototype.comfyClass=="Image Category Scorer") {
+        if (nodeType.prototype.comfyClass=="Running Average" || 
+            nodeType.prototype.comfyClass=="Image Category Scorer" || 
+            nodeType.prototype.comfyClass=="Show Scores") {
             nodeType.prototype.displayMessage = displayMessage;
         }
     }

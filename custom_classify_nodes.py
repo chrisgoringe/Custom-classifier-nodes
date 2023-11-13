@@ -51,7 +51,6 @@ def most_likely(dict):
             idx = i
     return idx, category, prob
 
-
 class BaseClassifier:
     CATEGORY = "CustomClassifier"
     FUNCTION = "func"
@@ -77,23 +76,25 @@ class BaseClassifier:
                 with open(os.path.join(folder,classifier,'categories.json')) as f:
                     categories = json.load(f)['categories']
 
-        i = 255. * image[0].cpu().numpy()
+        i = 255. * image.cpu().numpy()
         image = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
 
         return cls.probability_calculator(os.path.join(folder,classifier), categories)(image)
-
-
-class ImageClassification(BaseClassifier):
+    
     @classmethod
-    def INPUT_TYPES(s):
+    def get_model_directories(cls):
         model_directories = []
         for folder in folder_paths.folder_names_and_paths["customclassifier"][0]:
             for subfolder in os.listdir(folder):
                 if os.path.exists(os.path.join(folder,subfolder,"categories.json")):
                     model_directories.append(subfolder)
+        return model_directories
 
+class ImageClassification(BaseClassifier):
+    @classmethod
+    def INPUT_TYPES(cls):
         return {"required": { 
-            "classifier": (model_directories, ),
+            "classifier": (cls.get_model_directories(), {}),
             "image": ("IMAGE", {}),
         } }
     
@@ -101,33 +102,33 @@ class ImageClassification(BaseClassifier):
     RETURN_NAMES = ("Category", "Probability", "Details")
     
     def func(self, classifier, image):
-        probabilities = self.get_probs(classifier, image)
+        probabilities = self.get_probs(classifier, image[0])
         idx, category, prob = most_likely(probabilities)
-
+        warn = "Only considered first image\n" if len(image)>1 else ""
         return (
             category, 
             prob, 
-            "\n".join(["{:>6.2f}% {:<20}".format(100*probabilities[l],l) for l in probabilities]),
+            warn+"\n".join(["{:>6.2f}% {:<20}".format(100*probabilities[l],l) for l in probabilities]),
         )
 
 class ImageCategoryScorer(BaseClassifier):
     @classmethod
-    def INPUT_TYPES(s):
+    def INPUT_TYPES(cls):
         return {
             "required": { 
-            "classifier": (folder_paths.get_filename_list("customclassifier"), ),
-                "image": ("IMAGE", {}),
+            "classifier": (cls.get_model_directories(), {}),
+                "images": ("IMAGE", {}),
                 "category": ("STRING",{"default":""}),
             },
             "hidden": { "node_id": "UNIQUE_ID" }, 
         }
     
-    RETURN_TYPES = ("FLOAT",  "STRING")
-    RETURN_NAMES = ("Probability", "ProbString")
+    RETURN_TYPES = ("FLOATLIST",  "STRING")
+    RETURN_NAMES = ("Probabilities", "ProbString")
 
-    def func(self, classifier, image, category, node_id):
-        probabilities = self.get_probs(classifier, image)
-        prob = probabilities.get(category,0)
-        text = "{:>6.2f}".format(100*prob)
+    def func(self, classifier, images, category, node_id):
+        probs = [self.get_probs(classifier, image).get(category,0) for image in images]
+        text = ",".join(["{:>6.2f}".format(100*prob) for prob in probs])
         PromptServer.instance.send_sync("cg.image_classify.textmessage", {"id": node_id, "message":text})
-        return ( prob, "{:>6.2f}".format(100*prob) )
+        return ( probs, text )
+    
