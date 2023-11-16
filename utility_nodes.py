@@ -6,7 +6,7 @@ class SaveIf(SaveImage):
     def INPUT_TYPES(s):
         it = super().INPUT_TYPES()
         it['required']['scores'] = ("FLOATLIST", {"default":0.0})
-        it['required']['threshold'] = ("FLOAT", {"default":0.5})
+        it['required']['threshold'] = ("FLOAT", {"default":0.5, "step":0.001})
         return it
     FUNCTION = "func"
     CATEGORY = "CustomClassifier"
