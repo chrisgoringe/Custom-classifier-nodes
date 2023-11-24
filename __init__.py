@@ -1,9 +1,11 @@
 from .custom_classify_nodes import *
 from .utility_nodes import *
+from .aesthetic_score_nodes import *
 
 NODE_CLASS_MAPPINGS = { 
     "Single Image Classifier" : ImageClassification,
     "Image Category Scorer": ImageCategoryScorer,
+    "Image Aesthetic Scorer": ImageScorer,
     "Save If": SaveIf,
     "Running Average": RunningAverage,
     "Score Operations": ScoreOperations,
@@ -22,3 +24,4 @@ module_js_directory = os.path.join(module_root_directory, "js")
 shutil.copytree(module_js_directory, application_web_extensions_directory, dirs_exist_ok=True)
 
 folder_paths.folder_names_and_paths["customclassifier"] = ([os.path.join(folder_paths.models_dir, "customclassifier")], ["folder"])
+folder_paths.folder_names_and_paths["customaesthetic"] = ([os.path.join(folder_paths.models_dir, "customaesthetic")], [".safetensors"])
