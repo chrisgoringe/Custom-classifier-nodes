@@ -1,5 +1,6 @@
 from nodes import SaveImage
 from server import PromptServer
+import math
 
 class SaveIf(SaveImage):
     @classmethod
@@ -68,7 +69,7 @@ class RunningAverage:
     @classmethod
     def INPUT_TYPES(s):
         return {
-            "required":{"scores":("FLOATLIST", {})},
+            "required":{"scores":("FLOATLIST", {}), "mode":(['value','percentage'],{}),},
             "hidden": { "node_id": "UNIQUE_ID" },
         }
                     
@@ -83,18 +84,26 @@ class RunningAverage:
         self.reset()
 
     def reset(self):
-        self.total = 0
         self.count = 0
+        self.mean = 0
+        self.Q = 0
         if self.node_id: PromptServer.instance.send_sync("cg.image_classify.textmessage", {"id": self.node_id, "message":""})
 
-    def func(self, scores, node_id):
+    def func(self, scores, mode, node_id):
         Messages.register(node_id,self)
         self.node_id = node_id
-        self.total += sum(scores)
+        old_mean = self.mean
+        
+        self.mean = (self.mean*self.count + sum(scores))/(self.count+len(scores))
+        self.Q += sum((x-old_mean)*(x-self.mean) for x in scores)
         self.count += len(scores)
-        text = "{:>6.2f}% ({:>3})".format(100*self.total/self.count, self.count)
+        
+        if mode=='percentage':
+            text = "{:>6.2f} +/- {:>6.2f} % ({:>3})".format(100*self.mean, 100*math.sqrt(self.Q/self.count), self.count)
+        else:
+            text = "{:>6.3f} +/- {:>6.2f} ({:>3})".format(self.mean, math.sqrt(self.Q/self.count), self.count)
         PromptServer.instance.send_sync("cg.image_classify.textmessage", {"id": node_id, "message":text})
-        return (self.total/self.count,text,)
+        return (self.mean,"{:>6.3f}".format(self.mean),)
 
 class Messages:
     nodes = {}
