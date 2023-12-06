@@ -24,7 +24,8 @@ class BaseClassifier:
         metadata_bytes = data[8 : 8 + n]
         header = json.loads(metadata_bytes)
         self.model_metadata = header.get("__metadata__", {})
-        self.model = AestheticPredictor(clipper=CLIP(pretrained=self.model_metadata.get('clip_model','ViT-L/14')), pretrained=path, dropouts=[0,0,0])
+        self.model = AestheticPredictor(clipper=CLIP(pretrained=self.model_metadata.get('clip_model','ViT-L/14')), 
+                                        pretrained=path)
         self.model.eval()
         mean = float(self.model_metadata['mean_predicted_score'])
         std = float(self.model_metadata['stdev_predicted_score'])
