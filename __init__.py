@@ -1,6 +1,7 @@
 from .custom_classify_nodes import *
 from .utility_nodes import *
 from .aesthetic_score_nodes import *
+from .nudge_conditioning_node import *
 
 NODE_CLASS_MAPPINGS = { 
     "Single Image Classifier" : ImageClassification,
@@ -10,6 +11,7 @@ NODE_CLASS_MAPPINGS = {
     "Running Average": RunningAverage,
     "Score Operations": ScoreOperations,
     "Show Scores": ShowScores,
+    "Nudge Conditioning" : NudgeConditioning,
     }
 
 __all__ = ['NODE_CLASS_MAPPINGS']
