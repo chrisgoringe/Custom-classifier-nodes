@@ -18,7 +18,7 @@ class NudgeConditioning:
     def func(self, conditioning, nudge_file:str, nudge_strength:float, replace_token:int):
         if len(conditioning)>1: print("Warning - conditionings after the first are being lost")
         
-        c0:torch.Tensor = conditioning[0][0]                            
+        c0:torch.Tensor = conditioning[0][0].clone()
         L = c0.shape[2]
         c1:torch.Tensor = load_file(nudge_file)['nudge']
         F = c1.shape[0]
