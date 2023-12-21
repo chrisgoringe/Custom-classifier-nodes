@@ -11,7 +11,7 @@ class BaseNudge:
     STD = {  "conditioning": ("CONDITIONING", ), 
                     "token_strength": ("FLOAT", {"default": 1.0, "step": 0.01}),
                     "replace_token": ("INT",{"default":76, "min":-1, "max":76}),
-                    "pool_strength": ("FLOAT", {"default": 1.0, "step": 0.01}) }
+                    "pool_strength": ("FLOAT", {"default": 0.25, "step": 0.01}) }
 
     @classmethod
     def ADD_STANDARD_INPUT_TYPES(cls, it):
