@@ -11,6 +11,7 @@ NODE_CLASS_MAPPINGS = {
     "Running Average": RunningAverage,
     "Score Operations": ScoreOperations,
     "Show Scores": ShowScores,
+    "Sort by Scores": SortByScores,
     "Nudge Conditioning" : NudgeConditioning,
     }
 

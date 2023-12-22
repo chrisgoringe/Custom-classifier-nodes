@@ -4,6 +4,7 @@ from .aesthetic_predictor import AestheticPredictor
 from .clip import CLIP
 from PIL import Image
 import numpy as np
+import torch
 
 class BaseClassifier:
     CATEGORY = "CustomAestheticScorer"
@@ -52,3 +53,21 @@ class ImageScorer(BaseClassifier):
             img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
             scores.append(self.scale(self.model.evaluate_image(img)))
         return ( ",".join(str(x) for x in scores), images, scores )
+
+class SortByScores:
+    CATEGORY = "CustomAestheticScorer"
+    FUNCTION = "func"    
+    
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"images": ("IMAGE", {}), "scores": ("FLOATLIST",), "order": (["descending", "ascending"], ) } }
+    
+    RETURN_TYPES = ("IMAGE", )
+    RETURN_NAMES = ("images", )
+
+    def func(self, images:torch.Tensor, scores, order):
+        score_image = list( (score, images[i]) for i, score in enumerate(scores) )
+        score_image.sort(reverse=(order=='descending'))
+        sorted_images = list( si[1] for si in score_image )
+        result = torch.stack( sorted_images )
+        return (result, )
