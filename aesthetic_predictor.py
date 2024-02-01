@@ -1,38 +1,45 @@
 import torch
 import torch.nn as nn
 from safetensors.torch import load_file
-from .clip import CLIP
+from .feature_extractor import FeatureExtractor
 import os, json
 
 class AestheticPredictor(nn.Module):
-    def __init__(self, clipper:CLIP, input_size=768, pretrained="", device="cuda", dropouts:list=None, hidden_layer_sizes=None, seed=42):  
+    @classmethod
+    def from_pretrained(cls, pretrained:str):
+        metadata, _ = cls.load_metadata_and_sd(pretrained=pretrained, return_sd=False)
+        fe_model = metadata["feature_extractor_model"]
+        return AestheticPredictor(feature_extractor=FeatureExtractor.get_feature_extractor(pretrained=fe_model), pretrained=pretrained)
+
+    def __init__(self, feature_extractor:FeatureExtractor, pretrained, device="cuda", dropouts:list=[], hidden_layer_sizes=None, seed=42, **kwargs):  
         super().__init__()
         torch.manual_seed(seed)
         self.metadata, sd = self.load_metadata_and_sd(pretrained)
 
-        hidden_layer_sizes = hidden_layer_sizes or [int(x) for x in self.metadata.get('layers','[0]')[1:-1].split(',')]
-        dropouts = dropouts or [0]*len(hidden_layer_sizes)
-        while len(dropouts) < len(hidden_layer_sizes): dropouts.append(0)
+        hidden_layer_sizes = [int(x) for x in self.metadata.get('layers','[0]')[1:-1].split(',')] if 'layers' in self.metadata else hidden_layer_sizes
+        while len(dropouts) < len(hidden_layer_sizes)+1: dropouts.append(0)
 
-        self.metadata['input_size'] = str(input_size)
+        if "feature_extractor_model" in self.metadata: 
+            assert self.metadata["feature_extractor_model"] == feature_extractor.metadata["feature_extractor_model"], "Mismatched feature extractors"
+
+        self.metadata['input_size'] = str(feature_extractor.number_of_features)
         self.metadata['layers'] = str(hidden_layer_sizes)
 
-        if dropouts[-1]!=0: print("Last dropout non-zero - that's probably not a great idea...")
-        
         self.layers = nn.Sequential( )
-        current_size = input_size
+        current_size = feature_extractor.number_of_features
         for i, hidden_layer_size in enumerate(hidden_layer_sizes):
+            self.layers.append(nn.Dropout(dropouts[i]))
             self.layers.append(nn.Linear(current_size, hidden_layer_size))
             current_size = hidden_layer_size
-            self.layers.append(nn.Dropout(dropouts[i]))
             self.layers.append(nn.ReLU())
+        self.layers.append(nn.Dropout(dropouts[-1]))
         self.layers.append(nn.Linear(current_size, 1))
 
         if sd: self.load_state_dict(sd)
         
         self.layers.to(device)
         self.device = device
-        self.clipper = clipper
+        self.feature_extractor = feature_extractor
 
         if 'mean_predicted_score' in self.metadata:
             mean = float(self.metadata['mean_predicted_score'])
@@ -41,7 +48,8 @@ class AestheticPredictor(nn.Module):
         else:
             self.scale = lambda a : float(a)
 
-    def load_metadata_and_sd(self, pretrained):
+    @classmethod
+    def load_metadata_and_sd(cls, pretrained, return_sd=True):
         if pretrained:
             with open(pretrained, "rb") as f:
                 data = f.read()
@@ -49,7 +57,7 @@ class AestheticPredictor(nn.Module):
             n = int.from_bytes(n_header, "little")
             metadata_bytes = data[8 : 8 + n]
             header = json.loads(metadata_bytes)
-            return header.get("__metadata__", {}), load_file(pretrained)
+            return header.get("__metadata__", {}), load_file(pretrained) if return_sd else {}
         else:
             return {}, {}
         
@@ -59,13 +67,16 @@ class AestheticPredictor(nn.Module):
     def forward(self, x, **kwargs):
         return self.layers(x)
     
+    def evaluate_image(self, img):
+        return self(self.feature_extractor._get_image_features_tensor(img))
+    
     def evaluate_files(self, files, as_sorted_tuple=False, eval_mode=False):
         def score_files(fs):
-            data = torch.stack(list(self.clipper.prepare_from_file(f) for f in fs))
+            data = torch.stack(list(self.feature_extractor.get_features_from_file(f) for f in fs))
             return self(data)
         
         def score_file(f):
-            return self(self.clipper.prepare_from_file(f)).item()
+            return self(self.feature_extractor.get_features_from_file(f)).item()
         
         if eval_mode:
             was_training = self.training
@@ -81,11 +92,7 @@ class AestheticPredictor(nn.Module):
             scores.sort()
 
         return scores
-    
-    def evaluate_image(self, image):
-        with torch.no_grad():
-            return self(self.clipper.get_image_features_tensor(image))
-    
+
     def evaluate_file(self, file):
         return self.evaluate_files([file], eval_mode=True)[0]
             

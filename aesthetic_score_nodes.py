@@ -1,10 +1,10 @@
 import folder_paths
 import json, os
 from .aesthetic_predictor import AestheticPredictor
-from .clip import CLIP
 from PIL import Image
 import numpy as np
 import torch
+from custom_nodes.cg_custom_core.ui_decorator import ui_signal
 
 class BaseClassifier:
     CATEGORY = "CustomAestheticScorer"
@@ -25,8 +25,7 @@ class BaseClassifier:
         metadata_bytes = data[8 : 8 + n]
         header = json.loads(metadata_bytes)
         self.model_metadata = header.get("__metadata__", {})
-        self.model = AestheticPredictor(clipper=CLIP.get_clip(pretrained=self.model_metadata.get('clip_model','ViT-L/14')), 
-                                        pretrained=path)
+        self.model = AestheticPredictor.from_pretrained(path)
         self.model.eval()
         mean = float(self.model_metadata['mean_predicted_score'])
         std = float(self.model_metadata['stdev_predicted_score'])
@@ -34,6 +33,7 @@ class BaseClassifier:
 
         self.model_path = path
 
+@ui_signal(['display_text'])
 class ImageScorer(BaseClassifier):
     @classmethod
     def INPUT_TYPES(cls):
@@ -51,8 +51,10 @@ class ImageScorer(BaseClassifier):
         for im in images:
             i = 255. * im.cpu().numpy()
             img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
-            scores.append(self.scale(self.model.evaluate_image(img)))
-        return ( ",".join(str(x) for x in scores), images, scores )
+            with torch.no_grad():
+                scores.append(self.scale(self.model.evaluate_image(img)))
+        score_string = ",".join(str(x) for x in scores)
+        return ( score_string, images, scores, score_string )
 
 class SortByScores:
     CATEGORY = "CustomAestheticScorer"
