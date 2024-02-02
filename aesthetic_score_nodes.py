@@ -5,7 +5,7 @@ from PIL import Image
 import numpy as np
 import torch
 from custom_nodes.cg_custom_core.ui_decorator import ui_signal
-from comfy.model_management import get_torch_device, unet_offload_device
+from comfy.model_management import get_torch_device, free_memory, unet_offload_device, soft_empty_cache
 
 class BaseClassifier:
     CATEGORY = "CustomAestheticScorer"
@@ -16,18 +16,18 @@ class BaseClassifier:
         self.model_path = None
         self.model_metadata = None
 
-    def load_model(self, path):
-        if self.model_path and self.model_path==path: return
-       
-        with open(path, "rb") as f:
-            data = f.read()
-            n_header = data[:8]
-        n = int.from_bytes(n_header, "little")
-        metadata_bytes = data[8 : 8 + n]
-        header = json.loads(metadata_bytes)
-        self.model_metadata = header.get("__metadata__", {})
-        self.model = AestheticPredictor.from_pretrained(path, use_cache=False)
-        self.model.to(unet_offload_device())
+    def load_model(self, path, device):
+        if not (self.model_path and self.model_path==path): 
+            with open(path, "rb") as f:
+                data = f.read()
+                n_header = data[:8]
+            n = int.from_bytes(n_header, "little")
+            metadata_bytes = data[8 : 8 + n]
+            header = json.loads(metadata_bytes)
+            self.model_metadata = header.get("__metadata__", {})
+            self.model = AestheticPredictor.from_pretrained(path, use_cache=False, base_directory=os.path.dirname(os.path.realpath(__file__)))
+        self.model.to(device)
+        #self.model.to(torch.half)
         self.model_path = path
 
 @ui_signal(['display_text'])
@@ -43,8 +43,8 @@ class ImageScorer(BaseClassifier):
 
     def func(self, custom_model, images):
         model_path = os.path.join(folder_paths.folder_names_and_paths["customaesthetic"][0][0], custom_model)
-        self.load_model(model_path)
-        self.model.to(get_torch_device())
+        free_memory(2*1024*1024*1024, get_torch_device())
+        self.load_model(model_path, get_torch_device())
         scores = []
         for im in images:
             i = 255. * im.cpu().numpy()
@@ -53,6 +53,7 @@ class ImageScorer(BaseClassifier):
                 scores.append(self.model.scale(self.model.evaluate_image(img)))
         score_string = ",".join(str(x) for x in scores)
         self.model.to(unet_offload_device())
+        soft_empty_cache()
         return ( score_string, images, scores, score_string )
 
 class SortByScores:
