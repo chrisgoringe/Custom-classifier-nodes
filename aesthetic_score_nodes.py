@@ -5,6 +5,7 @@ from PIL import Image
 import numpy as np
 import torch
 from custom_nodes.cg_custom_core.ui_decorator import ui_signal
+from comfy.model_management import get_torch_device, unet_offload_device
 
 class BaseClassifier:
     CATEGORY = "CustomAestheticScorer"
@@ -25,12 +26,8 @@ class BaseClassifier:
         metadata_bytes = data[8 : 8 + n]
         header = json.loads(metadata_bytes)
         self.model_metadata = header.get("__metadata__", {})
-        self.model = AestheticPredictor.from_pretrained(path)
-        self.model.eval()
-        mean = float(self.model_metadata['mean_predicted_score'])
-        std = float(self.model_metadata['stdev_predicted_score'])
-        self.scale = lambda a : float((a-mean)/std)
-
+        self.model = AestheticPredictor.from_pretrained(path, use_cache=False)
+        self.model.to(unet_offload_device())
         self.model_path = path
 
 @ui_signal(['display_text'])
@@ -47,13 +44,15 @@ class ImageScorer(BaseClassifier):
     def func(self, custom_model, images):
         model_path = os.path.join(folder_paths.folder_names_and_paths["customaesthetic"][0][0], custom_model)
         self.load_model(model_path)
+        self.model.to(get_torch_device())
         scores = []
         for im in images:
             i = 255. * im.cpu().numpy()
             img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
             with torch.no_grad():
-                scores.append(self.scale(self.model.evaluate_image(img)))
+                scores.append(self.model.scale(self.model.evaluate_image(img)))
         score_string = ",".join(str(x) for x in scores)
+        self.model.to(unet_offload_device())
         return ( score_string, images, scores, score_string )
 
 class SortByScores:
