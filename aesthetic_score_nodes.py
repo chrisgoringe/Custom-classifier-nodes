@@ -4,7 +4,7 @@ from .aesthetic_predictor import AestheticPredictor
 from PIL import Image
 import numpy as np
 import torch
-from custom_nodes.cg_custom_core.ui_decorator import ui_signal
+from .ui_decorator import ui_signal
 from comfy.model_management import get_torch_device, free_memory, unet_offload_device, soft_empty_cache
 
 class BaseClassifier:

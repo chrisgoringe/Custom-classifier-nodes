@@ -1,4 +1,4 @@
-import torch, clip
+import torch
 from PIL import Image
 from safetensors.torch import save_file, load_file
 import os
