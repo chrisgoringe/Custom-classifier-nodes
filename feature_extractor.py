@@ -1,4 +1,4 @@
-import torch
+import torch, clip
 from PIL import Image
 from safetensors.torch import save_file, load_file
 import os
@@ -20,11 +20,18 @@ NUMBER_OF_FEATURES = {  "openai/clip-vit-large-patch14"            : 768,
                         "apple/aim-1B"                             : 2048,
                         "apple/aim-3B"                             : 3072,
                         "apple/aim-7B"                             : 4096,
+                        "ChrisGoringe/vitH16"                      : 1024,
+}
+
+# REALNAMES is used for downloading the (small) preprocessor file
+REALNAMES = {
+    "ChrisGoringe/vitH16" : "laion/CLIP-ViT-H-14-laion2B-s32B-b79K",
 }
 
 class FeatureExtractor:
     @classmethod
     def realname(cls, pretrained):
+        if pretrained in REALNAMES: return REALNAMES[pretrained]
         x = pretrained
         if x.startswith(r"models/"): x = x[7:]
         if x.endswith("-half"): x = x[:-5]
@@ -50,6 +57,7 @@ class FeatureExtractor:
         self.have_warned = False
         self.use_cache = use_cache
         self.base_directory = base_directory
+        self.dtype = torch.float
 
         self.cached = {}
         unique_name = pretrained if isinstance(pretrained, str) else "__".join(pretrained)
@@ -114,6 +122,7 @@ class FeatureExtractor:
     def set_dtype(self, dtype):
         if not self.model: return
         self.model.to(dtype)
+        self.dtype = dtype
 
     def simplify(self):
         pass

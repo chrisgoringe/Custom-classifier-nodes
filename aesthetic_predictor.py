@@ -14,7 +14,8 @@ class AestheticPredictor(nn.Module):
     def set_dtype(self, dtype):
         super().to(dtype)
         self.feature_extractor.set_dtype(dtype)
-        
+        self.dtype = dtype
+
     def to(self, device):
         super().to(device)
         self.feature_extractor._to(device, load_if_needed=False)
@@ -23,13 +24,17 @@ class AestheticPredictor(nn.Module):
     def __init__(self, feature_extractor:FeatureExtractor, pretrained, device="cuda", dropouts:list=[], hidden_layer_sizes=None, seed=42, **kwargs):  
         super().__init__()
         torch.manual_seed(seed)
+        self.dtype = torch.float
         self.metadata, sd = self.load_metadata_and_sd(pretrained)
 
         hidden_layer_sizes = [int(x) for x in self.metadata.get('layers','[0]')[1:-1].split(',')] if 'layers' in self.metadata else hidden_layer_sizes
         while len(dropouts) < len(hidden_layer_sizes)+1: dropouts.append(0)
 
         if "feature_extractor_model" in self.metadata: 
-            assert self.metadata["feature_extractor_model"] == feature_extractor.metadata["feature_extractor_model"], "Mismatched feature extractors"
+            assert self.metadata["feature_extractor_model"] == feature_extractor.metadata["feature_extractor_model"], \
+                "Mismatched feature extractors : saved file has " + \
+                self.metadata["feature_extractor_model"] + " arguments specify " + \
+                feature_extractor.metadata["feature_extractor_model"]
 
         self.metadata['input_size'] = str(feature_extractor.number_of_features)
         self.metadata['layers'] = str(hidden_layer_sizes)
