@@ -8,16 +8,22 @@ class SaveIf(SaveImage):
         it = super().INPUT_TYPES()
         it['required']['scores'] = ("FLOATLIST", {"default":0.0})
         it['required']['threshold'] = ("FLOAT", {"default":0.5, "step":0.001})
+        it['optional'] = {
+            "optional_scores" : ("FLOATLIST", {}),
+            "optional_threshold" : ("FLOAT", {"default":0.5, "step":0.001})
+        }
         return it
     FUNCTION = "func"
     CATEGORY = "CustomClassifier"
 
-    def func(self, scores, threshold, images, **kwargs):
+    def func(self, scores, threshold, images, optional_scores=None, optional_threshold=None, **kwargs):
         assert len(scores)==len(images)
         for i, score in enumerate(scores):
-            if score>=threshold: return self.save_images(images[i].unsqueeze_(0), **kwargs)
+            if score>=threshold: 
+                if optional_scores is None or optional_threshold is None or optional_scores[i]>optional_threshold:
+                    return self.save_images(images[i].unsqueeze_(0), **kwargs)
         return ()
-    
+      
 class ScoreOperations:
     @classmethod
     def INPUT_TYPES(s):
@@ -25,7 +31,8 @@ class ScoreOperations:
             "required":{
                 "x":("FLOATLIST", {}),
                 "y":("FLOATLIST", {}),
-                "operation":(["max(x,y)", "min(x,y)", "x+y", "x-y", "x*y", "x/y"],{})
+                "z":("FLOAT", {"default":0.0}),
+                "operation":(["max(x,y)", "min(x,y)", "x+y", "x-y", "x*y", "x/y", "x if y>z"],{})
                 },
             "optional":{}
         }
@@ -35,7 +42,7 @@ class ScoreOperations:
     FUNCTION = "func"
     CATEGORY = "CustomClassifier"
 
-    def func(self,x,y,operation):
+    def func(self,x,y,z,operation):
         assert len(x)==len(y)
         r = []
         for i,a in enumerate(x):
@@ -46,6 +53,7 @@ class ScoreOperations:
             if operation=="x-y": r.append(a-b)
             if operation=="x*y": r.append(a*b)
             if operation=="x/y": r.append(a/b)
+            if operation=="x if y>z" : r.append(a if b>z else 0)
         return (r,)
 
 class ShowScores:
