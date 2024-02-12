@@ -16,7 +16,9 @@ class BaseClassifier:
         self.model_path = None
         self.model_metadata = None
 
-    def load_model(self, path, device):
+    def load_model(self, custom_model, device):
+        path = os.path.join(folder_paths.folder_names_and_paths["customaesthetic"][0][0], custom_model)
+        free_memory(2*1024*1024*1024, get_torch_device())
         if not (self.model_path and self.model_path==path): 
             with open(path, "rb") as f:
                 data = f.read()
@@ -42,9 +44,7 @@ class ImageScorer(BaseClassifier):
     RETURN_NAMES = ("scores_str", "images", "scores", )
 
     def func(self, custom_model, images):
-        model_path = os.path.join(folder_paths.folder_names_and_paths["customaesthetic"][0][0], custom_model)
-        free_memory(2*1024*1024*1024, get_torch_device())
-        self.load_model(model_path, get_torch_device())
+        self.load_model(custom_model, get_torch_device())
         scores = []
         for im in images:
             i = 255. * im.cpu().numpy()
@@ -55,6 +55,23 @@ class ImageScorer(BaseClassifier):
         self.model.to(unet_offload_device())
         soft_empty_cache()
         return ( score_string, images, scores, score_string )
+    
+@ui_signal(['display_text'])
+class ConditioningScorer(BaseClassifier):
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"custom_model": (folder_paths.get_filename_list("customaesthetic"), ),
+                             "conditioning": ("CONDITIONING", {}),
+        } }
+    
+    RETURN_TYPES = ("STRING", "CONDITIONING", "FLOAT", )
+    RETURN_NAMES = ("score_str", "conditioning", "score", )
+
+    def func(self, custom_model, conditioning):
+        self.load_model(custom_model, get_torch_device())
+        score = self.model.scale(conditioning[0]['pooled_output'])
+
+        return ( f"{score}", conditioning, score, f"{score}", )
 
 class SortByScores:
     CATEGORY = "CustomAestheticScorer"
