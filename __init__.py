@@ -12,6 +12,7 @@ NODE_CLASS_MAPPINGS = {
     #"Single Image Classifier" : ImageClassification,
     #"Image Category Scorer": ImageCategoryScorer,
     "Image Aesthetic Scorer": ImageScorer,
+    "Conditioning Scorer" : ConditioningScorer,
     "Save If": SaveIf,
     "Running Average": RunningAverage,
     "Score Operations": ScoreOperations,
